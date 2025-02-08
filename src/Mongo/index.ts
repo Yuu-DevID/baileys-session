@@ -10,56 +10,26 @@ import { initAuthCreds } from "./auth-utils";
 
 const fileLock = new AsyncLock({ maxPending: Infinity });
 
-// Definisikan skema sesi dengan TTL 5 jam
-const sessionSchema = new mongoose.Schema({
-    _id: { type: String, required: true },
-    value: mongoose.Schema.Types.Mixed,
-    createdAt: { type: Date, expires: "5h", default: Date.now } // TTL index 5 jam
-});
-
-const Session = mongoose.model("Session", sessionSchema);
-
-// Helper untuk serialisasi Buffer menjadi string base64
-const serialize = (data: any): any => {
-    if (Buffer.isBuffer(data)) {
-        return `Buffer:${data.toString("base64")}`;
-    } else if (Array.isArray(data)) {
-        return data.map(item => serialize(item));
-    } else if (typeof data === "object" && data !== null) {
-        const result: any = {};
-        for (const [key, value] of Object.entries(data)) {
-            result[key] = serialize(value);
-        }
-        return result;
-    }
-    return data;
-};
-
-// Helper untuk deserialisasi string base64 menjadi Buffer
-const deserialize = (data: any): any => {
-    if (typeof data === "string" && data.startsWith("Buffer:")) {
-        return Buffer.from(data.slice(7), "base64");
-    } else if (Array.isArray(data)) {
-        return data.map(item => deserialize(item));
-    } else if (typeof data === "object" && data !== null) {
-        const result: any = {};
-        for (const [key, value] of Object.entries(data)) {
-            result[key] = deserialize(value);
-        }
-        return result;
-    }
-    return data;
-};
-
 let isConnected = false;
 
 export const useMongoAuthState = async (
-    mongoURI: string
+    mongoURI: string,
+    dbName: string = "test", // Default database name
+    collectionName: string = "sessions" // Default collection name
 ): Promise<{ state: AuthenticationState; saveCreds: () => Promise<void>; clearAll: () => Promise<void>; clearKeys: () => Promise<void>; }> => {
     if (!isConnected) {
-        await mongoose.connect(mongoURI, {});
+        await mongoose.connect(mongoURI, { dbName });
         isConnected = true;
     }
+
+    // Definisikan skema sesi dengan TTL 5 jam
+    const sessionSchema = new mongoose.Schema({
+        _id: { type: String, required: true },
+        value: mongoose.Schema.Types.Mixed,
+        createdAt: { type: Date, expires: "5h", default: Date.now } // TTL index 5 jam
+    });
+
+    const Session = mongoose.model(collectionName, sessionSchema);
 
     const cache = new Map();
 
@@ -160,4 +130,36 @@ export const useMongoAuthState = async (
         clearAll,
         clearKeys
     };
+};
+
+// Helper untuk serialisasi Buffer menjadi string base64
+const serialize = (data: any): any => {
+    if (Buffer.isBuffer(data)) {
+        return `Buffer:${data.toString("base64")}`;
+    } else if (Array.isArray(data)) {
+        return data.map(item => serialize(item));
+    } else if (typeof data === "object" && data !== null) {
+        const result: any = {};
+        for (const [key, value] of Object.entries(data)) {
+            result[key] = serialize(value);
+        }
+        return result;
+    }
+    return data;
+};
+
+// Helper untuk deserialisasi string base64 menjadi Buffer
+const deserialize = (data: any): any => {
+    if (typeof data === "string" && data.startsWith("Buffer:")) {
+        return Buffer.from(data.slice(7), "base64");
+    } else if (Array.isArray(data)) {
+        return data.map(item => deserialize(item));
+    } else if (typeof data === "object" && data !== null) {
+        const result: any = {};
+        for (const [key, value] of Object.entries(data)) {
+            result[key] = deserialize(value);
+        }
+        return result;
+    }
+    return data;
 };
