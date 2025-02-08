@@ -29,7 +29,7 @@ export const useMongoAuthState = async (
         createdAt: { type: Date, expires: "5h", default: Date.now } // TTL index 5 jam
     });
 
-    const Session = mongoose.model(collectionName, sessionSchema);
+    const Session = mongoose.models[collectionName] || mongoose.model(collectionName, sessionSchema);
 
     const cache = new Map();
 
